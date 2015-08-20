@@ -1,0 +1,80 @@
+POST /user/create : [
+					{
+						"mail" : { regex : "/^([\w-]+(?:\.[\w-]+)*)@((?:[\w-]+\.)*\w[\w-]{0,66})\.([a-z]{2,6}(?:\.[a-z]{2})?)$/i"},
+						"username" : { length minimum : 4 , length maximum : 30},
+						"gender" : { "Male" / "Female" , default : "Male"},
+						"password" : { length minimum : 8 , length maximum : 99 },
+						"age" : {type : Integer , min inclu : 13, max : 99},
+					},
+					success : 
+					{
+						"success" : true,
+						"link" : url (
+							uniquement en phase de dev, en prod sendMAil mailgun
+							validation de la boite mail, 
+							non essentiel pour se connecter
+							)
+					},
+					error : 
+					{
+						"success" : false,
+						"missingInputValue": ["inputMissingName", "inputMissingName",...],
+						"notMatchingInput": [],
+
+						(clé suivante facultatives, n existent pas sans erreur)
+						
+						"regexMail": false,
+
+						 "mail": {
+						    "success": false,
+						    "why": "mail used",
+						    "attach": "billant.jimmy@gmail.com"
+						  }
+
+						"username": {
+							"succes": false,
+							"why": "too short username"
+						},
+						"username": {
+						    "success": false,
+						    "why": "username used",
+						    "attach": "jimmy"
+						 },
+						
+						"passwordLength": false,
+
+						"birth_yearValid": {
+						    "success": false,
+						    "why": "Minimum age : 13" / "TOO OLD"
+						  }
+					}
+}]
+
+POST /user/login : [
+					{
+					"mail"
+					"password"
+					},
+
+					success : {
+						"success": true,
+						"Username" : username
+						"JWToken" : token de session
+					}
+
+					error : {
+						{success:false, input:"password", why :"incorrect"}
+						{success:false, input : mail, why:"unknown"}
+					}
+
+}]
+
+
+GET /user/search/:username : [
+					{
+						hearder : { "x-access-token" : JWToken}
+					}
+					{
+						
+					}
+					]
