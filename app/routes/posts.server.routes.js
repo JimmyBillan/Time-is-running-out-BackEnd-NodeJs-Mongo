@@ -8,7 +8,9 @@ module.exports = function(app) {
 	app.route('/post/modify').post(posts.modify);
 	app.route('/post/add1h').post(posts.add1h);
 	app.route('/post/timer/:id').get(posts.getTimer);
+
 	
 	app.route('/post/comment/:idPost/:postAuthor/').post(posts.addComment).get(posts.getCommentsByPostId);
+	app.route('/post/photo/:uri').get(posts.getPhoto);
 	
 };

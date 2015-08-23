@@ -322,7 +322,6 @@ function _listIamFollowing(token, users, decodedToken, res){
 						if(err)res.json(err);
 						else res.json({success:true, listFollow : docs, JWToken : token});
 
-						console.log(docs);
 					});
 					
 					
@@ -426,6 +425,7 @@ exports.getAvatar = function(req, res){
 
 exports.uploadProfilPic = function(req, res){
 	var token = req.headers['x-access-token'];
+	var orientationPic = req.headers["orientationpic"];
 	var ImageChecker = require('../../app/controllers/image.uploadChecker.js');
 
 	jwt.verify(token, config.secret, function(err, decoded){
@@ -433,7 +433,7 @@ exports.uploadProfilPic = function(req, res){
 			if(err.message == "jwt expired"){				
 				tokenRefresher.checkEXP(jwt.decode(token), jwt, config, function(err, newToken) {
 					if(err) res.json({success: false, tokenStatut : "expired"});
-					else ImageChecker.uploadProfilPic(jwt.decode(token),User,req, res);
+					else ImageChecker.uploadProfilPic(jwt.decode(token),orientationPic ,User,req, res);
 				});
 
 			}else{
@@ -443,10 +443,9 @@ exports.uploadProfilPic = function(req, res){
 
 		} else {
 
-			ImageChecker.uploadProfilPic(jwt.decode(token),User,req, res);
+			ImageChecker.uploadProfilPic(jwt.decode(token),orientationPic,User,req, res);
 		}
 	});
-
 
 }
 

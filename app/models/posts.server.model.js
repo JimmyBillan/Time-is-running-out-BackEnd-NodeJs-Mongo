@@ -12,8 +12,9 @@ var Comments = new Schema({
 		required : true
 	},
 	dateCreation : {
-		type : Date,
+		type : Number,
 		default: Date.now,
+		required : true
 	}
 });
 
@@ -24,7 +25,6 @@ var PostShema = new Schema({
 		},
 	rawData : {
 			type : String, 
-			required: true 
 		},
 	timer : {
 			type :  Number,
@@ -42,6 +42,9 @@ var PostShema = new Schema({
 	},
 	nbComment : {
 		type : Number
+	},
+	photoData : {
+		type : String
 	}
 
 });

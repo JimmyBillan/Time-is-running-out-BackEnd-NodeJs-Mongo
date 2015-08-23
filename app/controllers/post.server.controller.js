@@ -6,10 +6,38 @@ var tokenRefresher 	= require('../../app/controllers/user.server.tokenRefresher'
 var jwt    			= require('jsonwebtoken');
 var config 			= require('../../config/config.js');
 
-		var User 		= require('mongoose').model('User');
+var User 			= require('mongoose').model('User');
 
 
-function _create (token, post,decodedToken, res) {
+function _createSimply (token, post,decodedToken, res) {
+
+	Pchecker.validFormCreate(post,decodedToken,  function(err, result) {
+		if(!err){
+			var dateNow = Math.round(new Date().getTime()/1000);
+			var post = Post({
+				creator : decodedToken.username,
+				rawData : result.rawData,
+				timer : dateNow + result.timerPostinSecond,
+				dateCreation : dateNow
+			})
+			post.save(function(err) {
+				if(err){ console.log(err); res.json(err); }
+				else{
+					console.log(result.timerTotal);
+					res.json({success : true, timerTotal : result.timerTotal, JWToken: token});
+				}
+			});
+			
+		}	
+		else{
+			//rawdata not valid
+			console.log(result);
+			res.json(result);
+		}
+	});
+}
+/*
+function _createSimply_photo (token, req, decodedToken, res) {
 
 	Pchecker.validFormCreate(post,decodedToken,  function(err, result) {
 		if(!err){
@@ -33,21 +61,40 @@ function _create (token, post,decodedToken, res) {
 			res.json(result);
 		}
 	});
-}
+}*/
 
 exports.create = function(req, res) {
+	var ImageChecker = require('../../app/controllers/image.uploadChecker.js');
 	var token = req.headers['x-access-token'];
+	var photo = req.headers["orientationpic"];
 		jwt.verify(token, config.secret, function(err, decoded){
 			if(err){
 				if(err.message == "jwt expired"){
 					tokenRefresher.checkEXP(jwt.decode(token), jwt, config, function(err, newToken) {
 						if(err){res.json({success: false, tokenStatut : "expired"});} 
-	    				else{_create(newToken, req.body,jwt.decode(token), res);} 
+	    				else{
+	    					if(photo > -1){
+	    						console.log("photo == truerefresh");
+	    						ImageChecker.uploadPostPic(newToken,jwt.decode(token), Post, req, res)
+	    					}else{
+	    					_createSimply(newToken, req.body,jwt.decode(token), res);
+	    					}
+
+	    				} 
 	    			});
 				} else{
 					res.status(401).send(err);
 				}
-			}else{_create(token, req.body,jwt.decode(token), res);} 
+			}else{
+				if(photo > -1){
+	    			ImageChecker.uploadPostPic(token,jwt.decode(token),Post, req, res)
+	    		}else{
+	    			_createSimply(token, req.body,jwt.decode(token), res);
+	    		}
+
+				
+
+			} 
 		});
 	
 };
@@ -103,13 +150,15 @@ function _getPostUser(token, req, decodedToken, res) {
 		Post.find({creator:decodedToken.username, timer : {$gt :dateNow } },{},{sort:{dateCreation:-1}}, function(err, allPost){
 			if(err)res.send(err);
 			else{
-				res.json({success:true, JWToken : token, dateNow : dateNow, posts:allPost});
+				User.findOne({username:decodedToken.username},{_id : 1, profilPicUri:1}, function (err, doc) {
+					res.json({success:true, JWToken : token, dateNow : dateNow, posts:allPost, avatarUri : doc.profilPicUri});
+				})
+				
 				
 			}
 
 		});
-		
-	
+			
 }
 
 exports.getPostsUser = function(req, res) {
@@ -142,10 +191,13 @@ function _getPostFollowing(token, req, decodedToken, res) {
 					else{
 						
 						var allPost_count = allPost.length;
+						var listCreator = [];
 
 						if(allPost_count > 0){
 							for (var i = 0; i < allPost_count; i++) {
 								allPost[i].IamAdder = false;
+								listCreator.push(allPost[i].creator);
+
 								for(var j = 0; j < allPost[i].adder.length; j++){
 									if(decodedToken.username == allPost[i].adder[j]){
 										allPost[i].IamAdder = true;
@@ -154,22 +206,30 @@ function _getPostFollowing(token, req, decodedToken, res) {
 								delete allPost[i].adder;
 							};
 						}
+
+
+						User.find({username: {$in : listCreator}},{_id:0, profilPicUri:1, username : 1},function(err, doc) {
+								if(doc != null){
+									for (var i = 0; i < doc.length; i++) {
+										for (var j = 0; j < allPost.length; j++) {
+											if(doc[i].username == allPost[j].creator){
+												allPost[j].avatarUri = doc[i].profilPicUri;
+																
+											}
+										};
+									};
+								}
 						res.json({success:true, JWToken : token, dateNow : dateNow, posts:allPost});
+								
+						});
+			
 					}
 				});
 
 			}
 			});
-		
-
-					
-												
+															
 }
-
-
-		
-	
-
 
 exports.getPostFollowing = function(req, res) {
 	var token = req.headers['x-access-token'];
@@ -236,40 +296,41 @@ exports.add1h = function(req, res){
 }
 
 function _addComment (token, params, body, decodedToken, res) {
-	console.log(params.postAuthor+" "+decodedToken.username);
 
-	var conditon = {};
-	console.log(params);
 	function requetePush () {
-		var dateNow = new Date();
-				
-				Post.findOneAndUpdate(
-					{_id: params.idPost, creator:params.postAuthor},
-					{$push : 
-						{comments : 
-							{
-								creator : decodedToken.username, 
-								commentText : body.rawData,
-								dateCreation : dateNow
-							}
-						},
-						$inc: {nbComment : 1}
-					},
-					function(err, thePost){
-					if(err)res.json(err);
-					else{
-						if(thePost !== null){
-							res.json({success:true,JWToken : token})
-						}else{
-							res.json({success:false, why : "id\'s wrong"})
+			var dateNow = Math.round(new Date().getTime()/1000);
+			console.log(body);
+			Post.findOneAndUpdate(
+				{_id: params.idPost, creator:params.postAuthor},
+				{$push : 
+					{comments : 
+						{
+							creator : decodedToken.username, 
+							commentText : body.rawData,
+							dateCreation : dateNow
 						}
+					},
+					$inc: {nbComment : 1}
+				},
+				function(err, thePost){
+				if(err)res.json(err);
+				else{
+					if(thePost !== null){
+						res.json({success:true,JWToken : token})
+					}else{
+
+						res.json({success:false, why : "id\'s wrong"})
 					}
-				});
+				}
+			});
+
+		
+		
+
 	}
 
 	if(params.postAuthor == decodedToken.username){
 			requetePush();
-			console.log("myself posting");
 	}else{
 		User.findOne({followers : {$in : [decodedToken.username]},username : params.postAuthor},
 			{_id:1},
@@ -291,11 +352,11 @@ function _addComment (token, params, body, decodedToken, res) {
 
 exports.addComment = function(req,res) {
 	var token = req.headers['x-access-token'];
-
 	Pchecker.validCommentCreate(req.body.rawData, function(err, retour){
 			if(err){
 				res.json(retour);
 			}else{
+				console.log(retour);
 				req.body.rawData = retour;
 				try{
 					jwt.verify(token, config.secret, function(err, decoded){
@@ -332,23 +393,23 @@ function _getCommentsByPostId (token, params, decodedToken, res) {
 			else{
 				if(comments !== null){
 
-				var lesCreators = [];
-				comments.comments.forEach(function(com) {
-				lesCreators.push(com.creator);
-				})
-
-				User.find({username:{$in : lesCreators} }, {_id:0, username : 1,  profilPicUri : 1}, function(err, doc){
-					comments.comments.forEach(function(com2) {
-						doc.forEach(function(doc2) {
-							if(com2.creator == doc2.username){
-								com2.profilPicUri = doc2.profilPicUri;
-								
-							}
-						})
-						
+					var lesCreators = [];
+					comments.comments.forEach(function(com) {
+					lesCreators.push(com.creator);
 					})
-					res.json({success:true,JWToken : token, comments : comments.comments})						
-				});
+
+					User.find({username:{$in : lesCreators} }, {_id:0, username : 1,  profilPicUri : 1}, function(err, doc){
+						comments.comments.forEach(function(com2) {
+							doc.forEach(function(doc2) {
+								if(com2.creator == doc2.username){
+									com2.profilPicUri = doc2.profilPicUri;
+									
+								}
+							})
+							
+						})
+						res.json({success:true,JWToken : token, comments : comments.comments, dateNow : dateNow = Math.round(new Date().getTime()/1000)})
+					});
 										
 				}else{
 					res.json({success:false, why : "id\'s wrong"})
@@ -356,9 +417,9 @@ function _getCommentsByPostId (token, params, decodedToken, res) {
 			}
 		});
 	}
+
 	if(params.postAuthor == decodedToken.username){
 		requetFind();
-		console.log("find comments my post");
 	}else{
 		User.findOne({followers : {$in : [decodedToken.username]},username : params.postAuthor},
 			{_id:1},
@@ -418,5 +479,16 @@ exports.getTimer = function(req, res) {
 	}
 
 };
+
+
+exports.getPhoto = function(req, res){
+	var path = require('path');
+	if(req.params.uri != 'photo'){
+		res.sendFile(path.join(__dirname, '../public/images/post/',req.params.uri));
+	}
+	else{
+		res.status(401).json({success:false, why : "missing parameter"});
+	}
+}
 
 
