@@ -6,6 +6,11 @@ function validateEmail(email) {
     return re.test(email);
 }
 
+function validateUsername(username){
+	var re = /^[a-z0-9_-]{4,30}$/;
+	return re.test(username);
+}
+
 function validatePassword(password){
 	if(password.length< 8 || password.length > 99) return false;
 	else return true;
@@ -73,8 +78,9 @@ exports.validFormInscription = function(user, cb) {
 			return cb(null,errors);
 	}
 
-	if(user.username.length < 4 || user.username.length >254){
-		errors.username = {succes : false, why :"Username length"};
+	user.username= user.username.toLowerCase();
+	if(!validateUsername(user.username)){
+		errors.username = {succes : false, why :"Username regex"};
 		errors.success = false;
 	}
 

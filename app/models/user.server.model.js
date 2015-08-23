@@ -57,7 +57,7 @@ var UserSchema = new Schema({
 			followings: {
 				type : [String]
 			},
-			nbfollower : {
+			nbFollower : {
 				type : Number,
 				min : 0,
 			},

@@ -25,7 +25,7 @@ New_User.prototype.sendMailConfirm = function(){
 		from : config.from_who,
 		to : this.mail,
 		subject : 'Welcome to Tiro',
-		html :'http://92.222.67.16/user/confirm_mail/'+this.mail+'/'+this.token+'',
+		html :'Hi, Welcome to Tiro ! <br> <a href="http://tiro-app.com/user/confirm_mail/'+this.mail+'/'+this.token+'">Following this link to validate your account</a> <br><br> Or copy this link in your browser http://tiro-app.com/user/confirm_mail/'+this.mail+'/'+this.token+'',
 	}
 	mailgun.messages().send(data, function(err,body){
 		if(err){

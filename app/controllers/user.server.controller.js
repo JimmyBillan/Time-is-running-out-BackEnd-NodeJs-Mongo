@@ -103,11 +103,13 @@ exports.create = function(req, res, next) {
 		next(err); 
 	else {
 		// Error input in the form
-		if(typeof userInput.success != "undefined")res.json(userInput);
-		
+		if(typeof userInput.success != "undefined"){
+			res.json(userInput);
+		console.log("1");
 		// Form was ok
-		else{
+		}else{
 			//Look if user or mail is not already used 
+			console.log("2");
 			User.find({ $or : [ 
 				{mail:userInput.mail}, {username:userInput.username}]},
 				{_id : 0, mail : 1, username : 1}, 
@@ -115,31 +117,41 @@ exports.create = function(req, res, next) {
 
 					//User and mail dont exist
 					if(doc.length == 0){
+						console.log("3");
 						var user = new User(userInput); 
 						user.save(function(err) {
 							if(err){ res.json(err); }
 							else { 
 								//Object send mail and hash token
 								var  signin = new _SigninMail(user.mail, user.password_date);
-
+								console.log("4");
 								signin.generateToken()
+								console.log("4.1");
 								
 								if(process.env.NODE_ENV === "development"){
 									res.json({success:true, link:'http://tiro-app.com/user/confirm_mail/'+signin.mail+'/'+signin.token});
+									console.log("5");
 							
 								}else{
-									signin.sendMailConfirm();
 									res.json({success:true});
+									signin.sendMailConfirm();
+									console.log("6");
+									
 								}
 							}
 						});
 					} 
 					//User or mail exist already
 					else {
-						if(userInput.mail == doc[0].mail)
-							res.json({"mail":{success:false, why : "mail used", attach : userInput.mail}});
-						else
-							res.json({"username":{success:false, why : "username used", attach : userInput.username}});
+						console.log("7");
+						if(userInput.mail == doc[0].mail){
+							console.log("8");
+							res.json({success:false, why : "mail used", attach : userInput.mail});
+						}
+						else{
+							console.log("9");
+							res.json({success:false, why : "username used", attach : userInput.username});
+						}
 						
 					}
 				}

@@ -20,7 +20,9 @@ function checkRawDataPhotoMode(rawData, cb){
 	if(rawData){
 		console.log("ya rawData");
 		if(rawData.length < 1000){
-			rawData = xssEscape(rawData);
+			rawData = xssEscape(decodeURI(rawData.replace(/\+/g, ' ')));
+
+			console.log(rawData);
 			cb(null, rawData);
 		}else{
 			cb(true, {success : false, why :"RawData too long"});
