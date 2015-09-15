@@ -64,14 +64,22 @@ exports.uploadProfilPic = function(token,orientationPic, modelUser, req, res){
                 var   new_location = path.join(__dirname, '../public/images/profil/');
                 
                 fs.writeFileSync(new_location+newname, im.convert({
-                    quality : 40,
+                    quality : 50,
                     srcData: fs.readFileSync(temp_path),
                     rotate: getRotate(orientationPic),
+                    width: 250,
+                    height: 250,
+                    resizeStyle: 'aspectfit'
                 }));
 
                 modelUser.findOneAndUpdate({username: token.username}, {$set:{profilPicUri:newname}}, function(err, user){
                       if(user.profilPicUri){
-                        fs.unlinkSync( path.join(__dirname, '../public/images/profil/',user.profilPicUri));
+                        try {
+                          fs.unlinkSync( path.join(__dirname, '../public/images/profil/',user.profilPicUri));
+                        } catch (e) {
+                          console.log("error deleting file");
+                        }
+                        
                         res.status(200).send('received upload:\n\n');
                       }
                 })
@@ -134,6 +142,10 @@ exports.uploadPostPic = function(token,decodedToken,PostModel, req, res){
                 fs.writeFileSync(new_location+newname, im.convert({
                     srcData: fs.readFileSync(temp_path),
                     rotate: getRotate(_fields.orientationPIC),
+                    quality : 90,
+                    width: 720,
+                    height: 1280,
+                    resizeStyle: 'aspectfit'
                 }));
                  console.log("file saved  "+newname);
                 console.log("name db  "+post.photoData);

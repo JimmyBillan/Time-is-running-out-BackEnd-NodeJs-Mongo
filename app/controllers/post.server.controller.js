@@ -154,12 +154,11 @@ function _getPostUser(token, req, decodedToken, res) {
 					res.json({success:true, JWToken : token, dateNow : dateNow, posts:allPost, avatarUri : doc.profilPicUri});
 				})
 				
-				
 			}
-
 		});
 			
 }
+
 
 exports.getPostsUser = function(req, res) {
 	var token = req.headers['x-access-token'];
@@ -253,7 +252,7 @@ function _add1h(token, req, decodedToken, res){
 	User.findOne({username : decodedToken.username, followings : {$in : [req.creator]}}, function(err, doc){
 		if(err){ res.json(err);}
 		else{
-			
+			console.log(req.creator);
 			if(doc !== null){
 			
 				Post.findOneAndUpdate({_id:mongoose.Types.ObjectId(req.id),creator : req.creator, adder : {$ne : decodedToken.username}},
@@ -261,7 +260,7 @@ function _add1h(token, req, decodedToken, res){
 						if(err){res.json(err)}
 						else{
 							if(thepost !== null){
-								res.json({add1h : "success", id  : req.id});
+								res.json({success : true, id  : req.id});
 							}else{
 								res.json({success : false, why : "id is wrong"});
 							}
@@ -278,6 +277,7 @@ function _add1h(token, req, decodedToken, res){
 
 exports.add1h = function(req, res){
 	var token = req.headers['x-access-token'];
+	console.log(req.body);
 	jwt.verify(token, config.secret, function(err, decoded){
 		if(err){
 			if(err.message == "jwt expired"){

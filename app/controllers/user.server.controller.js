@@ -1,4 +1,5 @@
 var User 		= require('mongoose').model('User');
+var Post 			= require('mongoose').model('Post');
 var Uchecker 	= require('../../app/controllers/user.server.createChecker');
 var _SigninMail = require('../../app/controllers/user.server.SendMail.signin');
 
@@ -11,6 +12,8 @@ function _getTime(token, username, res){
 	User.findOne({username:username},{_id:0, timer : 1, timerDate : 1}, function(err, doc){
 		if(err){ res.json({success:false, error : err})}
 		else{
+			//Update credit time
+
 			if( ((new Date() - doc.timerDate)/1000) > 86400){
 				User.findOneAndUpdate({username : username}, {$set:{timerDate: new Date(), timer : 2880}},{new: true}, function(err, userUpdated){
 					if(err)res.send(err);
@@ -30,6 +33,7 @@ function _getTime(token, username, res){
 
 exports.getTime = function(req, res) {
 	var token = req.headers['x-access-token'];
+	console.log(jwt.decode(token));
    	jwt.verify(token, config.secret, function(err, decoded){
     		if(err){
     			if(err.message == "jwt expired"){
@@ -47,29 +51,72 @@ exports.getTime = function(req, res) {
     			_getTime(token, jwt.decode(token).username, res);
     		}
 
-    });
-    
-    
+    });    
 };
 
 function _profil (token, username, res){
-
+	var decodedToken = jwt.decode(token);
 	var projection = {};
 
-	if(jwt.decode(token).username == username){
+	if(decodedToken.username == username){
 		projection = {_id:0, username:1,nbFollowing : 1, nbFollower :1, profilPicUri : 1};
 	}else{
-		projection = {_id:0, username:1,profilPicUri : 1}
+		projection = {_id:0, username:1,profilPicUri : 1,nbFollower :1, profilPicUri : 1, nbFollowing : 1, followers : 1}
 	}
 	
-	User.findOne({username:username},projection,function(err, doc){
+	User.findOne({username:username},projection).lean().exec(function(err, doc){
 		if(err)res.json(err);
 		else{
-			res.json({success:true,JWToken : token, userData : doc});
+			if(doc != null){
+				var projection = { creator : 1, rawData : 1, photoData : 1, nbComment : 1, timer : 1,adder : 1 };
+				var dateNow = Math.round(new Date().getTime()/1000);
+				if(doc.username == decodedToken.username){
+
+					Post.find({creator : doc.username, timer : {$gt :dateNow }},projection,
+								{sort:{dateCreation:-1}}, 
+					function(err, lePost) {
+						res.json({success:true,JWToken : token, userData : doc,  userPost : lePost, dateNow : dateNow});
+					})
+				}else{
+					if(doc.followers.indexOf(decodedToken.username)> -1){
+					
+					Post.find({creator : doc.username, timer : {$gt :dateNow }}, projection,
+								{sort:{dateCreation:-1}}).lean().exec( 
+					function(err, lePost) {
+
+						var allPost_count = lePost.length;
+
+						if(allPost_count > 0){
+							for (var i = 0; i < allPost_count; i++) {
+								lePost[i].IamAdder = false;
+
+								for(var j = 0; j < lePost[i].adder.length; j++){
+									if(decodedToken.username == lePost[i].adder[j]){
+										lePost[i].IamAdder = true;
+									}
+								}
+								delete lePost[i].adder;
+							};
+						}
+
+						delete doc['followers'];
+						res.json({success:true,JWToken : token, userData : doc, userPost : lePost, dateNow : dateNow});
+					})
+					}else{
+						delete doc['followers'];
+						res.json({success:true,JWToken : token, userData : doc, dateNow : dateNow});
+					}
+					
+				}
+				
+
+
+
+			}
+			
 			
 		}
-	});
-	
+	});	
 }
 
 exports.profil = function(req, res) {
@@ -91,6 +138,51 @@ exports.profil = function(req, res) {
 		}
 	});
     
+};
+
+function _getDrawer(token, decodedToken, res){
+	projection = {_id:0, timer : 1 ,username:1, timerDate : 1, nbFollower : 1, nbFollowing : 1, nbNotification:1, profilPicUri : 1};
+	User.findOne({username:decodedToken.username}, projection, function(err, doc){
+		if(err)res.json({success : false, why : "error db"})
+		else{
+			console.log(decodedToken.username);
+			if( ((new Date() - doc.timerDate)/1000) > 86400){
+				User.findOneAndUpdate({username : decodedToken.username}, {$set:{timerDate: new Date(), timer : 2880}},{new: true}, function(err, userUpdated){
+					if(err)res.send(err);
+					else{
+						doc.timer = userUpdated.timer;
+
+						res.json({success:true, JWToken : token, doc : doc});
+						
+					}
+				});
+			}else{
+				console.log(doc);
+				res.json({success:true, JWToken : token, doc : doc});
+			}
+		}
+	});
+}
+
+exports.getDrawer = function(req, res) {
+	var token = req.headers['x-access-token'];
+	console.log(token);
+    jwt.verify(token, config.secret, function(err, decoded){
+		if(err){
+			if(err.message == "jwt expired"){
+    			tokenRefresher.checkEXP(jwt.decode(token), jwt, config, function(err, newToken) {
+    				if(err) res.json({success: false, tokenStatut : "expired"});
+    				else _getDrawer(newToken, jwt.decode(token), res);
+    			});
+			} else {
+				res.status(401).send(err);
+			}
+
+			
+		} else {
+			_getDrawer(token, jwt.decode(token), res);
+		}
+	});
 };
 
 
@@ -313,15 +405,15 @@ exports.searchPublic = function(req, res) {
 
 function _listIamFollowing(token, users, decodedToken, res){
 	
-		User.find({username:decodedToken.username},{_id:0, followings : 1}, function(err, listIamFollowing) {
+		User.findOne({username:decodedToken.username},{_id:0, followings : 1, tmp_followings : 1}, function(err, doc) {
 			if(err)res.json(err);
 			else{ 
-
+				var list = doc.followings.concat(doc.tmp_followings);
 				if(users){ // case : recherhe nouveau contact nettoie resultat ne pas apparaitre ni les contacts qu'on suit deja
-					console.log(users);
-					for (var i = 0 ; i < listIamFollowing[0].followings.length; i++) {
+					
+					for (var i = 0 ; i < list.length; i++) {
 						for (var j = 0; j < users.length; j++) {
-							if(listIamFollowing[0].followings[i] == users[j].username || users[j].username == decodedToken.username){
+							if(list[i] == users[j].username || users[j].username == decodedToken.username){
 								users.splice(j,1);
 							}
 
@@ -330,7 +422,7 @@ function _listIamFollowing(token, users, decodedToken, res){
 
 					res.json({success:true, users : users, JWToken : token});
 				} else {
-					User.find({username: {$in : listIamFollowing[0].followings}},{_id:0, username:1, nbFollower : 1, profilPicUri : 1}, function(err, docs) {
+					User.find({username: {$in : list}},{_id:0, username:1, nbFollower : 1, profilPicUri : 1}, function(err, docs) {
 						if(err)res.json(err);
 						else res.json({success:true, listFollow : docs, JWToken : token});
 
@@ -369,10 +461,12 @@ exports.listIamFollowing = function(req, res) {
 }
 
 function _listMyFollower (token, decodedToken, res) {
-	User.findOne({username:decodedToken.username},{_id:0,  followers:1},function(err,doc) {
+	User.findOne({username:decodedToken.username},{_id:0,  followers:1, tmp_followers : 1},function(err,doc) {
 		if(err)res.json(err);
 		else{
-			User.find({username : {$in : doc.followers}},{_id:0, username:1, nbFollower : 1, profilPicUri : 1}, function(err,docs) {
+			var list = doc.followers.concat(doc.tmp_followers);
+			console.log(list);
+			User.find({username : {$in : list}},{_id:0, username:1, nbFollower : 1, profilPicUri : 1}, function(err,docs) {
 				
 				res.json({success:true,listFollow : docs, JWToken : token});
 			});
@@ -417,16 +511,19 @@ exports.getAvatarUri = function(req, res){
 	})
 }
 
-exports.getImage = function(req, res){
-    var path = require('path');
-	imageID = "ic_19405_10207287425046354_445544690276139381_n.png";
-    res.sendFile(path.join(__dirname, '../public/images',imageID)).maxage(3600000);
-}
 
 exports.getAvatar = function(req, res){
 	var path = require('path');
 	if(req.params.profilPicUri != 'uri'){
-		res.sendFile(path.join(__dirname, '../public/images/profil/',req.params.profilPicUri));
+		
+		 try {
+          res.sendFile(path.join(__dirname, '../public/images/profil/',req.params.profilPicUri));
+        } catch (e) {
+        	console.log("here 404");
+          res.status(404).send("no avatar");
+        }
+        
+		
 	}
 	else{
 		res.status(401).json({success:false, why : "missing parameter"});

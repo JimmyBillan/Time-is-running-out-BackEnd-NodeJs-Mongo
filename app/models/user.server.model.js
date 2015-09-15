@@ -54,7 +54,13 @@ var UserSchema = new Schema({
 			followers : {
 				type : [String]
 			},
+			tmp_followers : {
+				type : [String]
+			},
 			followings: {
+				type : [String]
+			},
+			tmp_followings: {
 				type : [String]
 			},
 			nbFollower : {
